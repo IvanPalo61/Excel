@@ -476,6 +476,78 @@
       messageBox.className = 'message hidden';
     }
 
+    function normalizeApiBody(raw) {
+      let body;
+      try {
+        body = raw ? JSON.parse(raw) : {};
+      } catch {
+        return { ok: false, error: raw, raw };
+      }
+
+      if (body && typeof body.body === 'string') {
+        try {
+          return JSON.parse(body.body);
+        } catch {
+          return { ...body, nestedBody: body.body };
+        }
+      }
+
+      return body || {};
+    }
+
+    function getSpecificCode(body, response) {
+      return (
+        body.codigo ||
+        body.code ||
+        body.errorCode ||
+        body.error_code ||
+        body.statusCode ||
+        body.status ||
+        body.errorType ||
+        response?.status ||
+        'SIN_CODIGO'
+      );
+    }
+
+    function formatApiError(body, response, raw) {
+      const code = getSpecificCode(body, response);
+      const message = (
+        body.errorMessage ||
+        body.error ||
+        body.message ||
+        body.mensaje ||
+        body.detail ||
+        body.details ||
+        body.nestedBody ||
+        raw ||
+        'Error desconocido'
+      );
+
+      const lines = [
+        'Error procesando Excel',
+        `Codigo especifico: ${code}`,
+        response ? `HTTP status: ${response.status} ${response.statusText || ''}`.trim() : '',
+        body.requestId ? `Request ID: ${body.requestId}` : '',
+        body.traceId ? `Trace ID: ${body.traceId}` : '',
+        body.errorType ? `Tipo: ${body.errorType}` : '',
+        `Mensaje: ${typeof message === 'string' ? message : JSON.stringify(message)}`
+      ].filter(Boolean);
+
+      if (body.details) {
+        lines.push(`Detalles: ${JSON.stringify(body.details, null, 2)}`);
+      }
+
+      if (body.trace) {
+        lines.push(`Trace: ${Array.isArray(body.trace) ? body.trace.join('\n') : body.trace}`);
+      }
+
+      if (raw && raw.length && raw !== body.error && raw !== body.message) {
+        lines.push(`Respuesta cruda:\n${raw.slice(0, 3000)}`);
+      }
+
+      return lines.join('\n');
+    }
+
     function updatePreview() {
       companyPreview.textContent = companyCode.value.trim() || '-';
       bankPreview.textContent = bankCode.value.trim() || '-';
@@ -618,15 +690,13 @@
         });
 
         const raw = await response.text();
-        let body;
-        try {
-          body = raw ? JSON.parse(raw) : {};
-        } catch {
-          body = { ok: false, error: raw };
-        }
+        const body = normalizeApiBody(raw);
 
         if (!response.ok || body.ok === false) {
-          throw new Error(body.error || body.message || `HTTP ${response.status}`);
+          setMessage(formatApiError(body, response, raw), 'error');
+          statusText.textContent = `Error ${getSpecificCode(body, response)}`;
+          renderRows(Array.isArray(body.rows) ? body.rows : []);
+          return;
         }
 
         const rows = Array.isArray(body.rows) ? body.rows : [];
@@ -637,7 +707,11 @@
         statusText.textContent = 'Completado';
       } catch (error) {
         renderRows([]);
-        setMessage(`Error procesando Excel:\n${error.message}`, 'error');
+        setMessage([
+          'Error procesando Excel',
+          'Codigo especifico: ERROR_CLIENTE_HTML',
+          `Mensaje: ${error.message}`
+        ].join('\n'), 'error');
         statusText.textContent = 'Error';
       } finally {
         submitButton.disabled = false;
