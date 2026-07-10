@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Subir Excel bancario</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef2f6;
+      --panel: #ffffff;
+      --text: #1f2933;
+      --muted: #667085;
+      --line: #d7dde5;
+      --line-strong: #a9b4c2;
+      --primary: #1769aa;
+      --primary-dark: #0f4f86;
+      --danger: #b42318;
+      --success: #057a55;
+      --warning: #a15c00;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 22px;
+    }
+
+    .header-inner,
+    main {
+      width: min(1240px, calc(100% - 28px));
+      margin: 0 auto;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .status {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 11px;
+      color: var(--muted);
+      background: #f8fafc;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    main {
+      padding: 18px 0 26px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .panel-body {
+      padding: 16px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 0.65fr 0.75fr 1fr 0.75fr;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #344054;
+    }
+
+    input,
+    select {
+      width: 100%;
+      height: 39px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      padding: 0 10px;
+      font-size: 14px;
+      color: var(--text);
+      background: #ffffff;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(23, 105, 170, 0.14);
+    }
+
+    .file-box {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px dashed var(--line-strong);
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .file-name {
+      color: var(--muted);
+      font-size: 13px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .actions {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      height: 39px;
+      border-radius: 6px;
+      padding: 0 14px;
+      border: 1px solid var(--line-strong);
+      background: #ffffff;
+      color: #344054;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .message {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      border-radius: 7px;
+      padding: 11px 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .message.success {
+      color: var(--success);
+      background: #f0fdf7;
+      border-color: rgba(5, 122, 85, 0.35);
+    }
+
+    .message.error {
+      color: var(--danger);
+      background: #fff4f2;
+      border-color: rgba(180, 35, 24, 0.35);
+    }
+
+    .message.warning {
+      color: var(--warning);
+      background: #fff8eb;
+      border-color: rgba(161, 92, 0, 0.35);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 10px;
+      background: #ffffff;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 5px;
+    }
+
+    .metric-value {
+      font-size: 16px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #ffffff;
+      max-height: 560px;
+    }
+
+    table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th,
+    td {
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 7px 8px;
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #eef2f6;
+      color: #344054;
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tr:nth-child(even) td {
+      background: #fafbfc;
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 18px;
+      text-align: center;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #f8fafc;
+    }
+
+    .download-link {
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    @media (max-width: 980px) {
+      .form-grid,
+      .summary {
+        grid-template-columns: 1fr;
+      }
+
+      .header-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .status {
+        white-space: normal;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>Subir Excel bancario</h1>
+      <div class="status" id="statusText">Listo</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Datos y archivo</h2>
+      </div>
+      <div class="panel-body">
+        <div class="form-grid">
+          <div class="field">
+            <label for="companyCode">cve_compania</label>
+            <input id="companyCode" type="text" inputmode="numeric" placeholder="121">
+          </div>
+
+          <div class="field">
+            <label for="bankCode">cve_banco</label>
+            <input id="bankCode" type="text" placeholder="BBV">
+          </div>
+
+          <div class="field">
+            <label for="bankAccount">num_cuenta_banco</label>
+            <input id="bankAccount" type="text" inputmode="numeric" placeholder="407273014">
+          </div>
+
+          <div class="field">
+            <label for="returnMode">Respuesta</label>
+            <select id="returnMode">
+              <option value="pdf" selected>PDF + datos</option>
+              <option value="excel">Excel + datos</option>
+              <option value="message">Solo texto</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="file-box">
+          <div class="file-name" id="fileName">Selecciona un archivo .xlsx o .xls</div>
+          <input id="fileInput" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+        </div>
+
+        <div class="actions">
+          <button class="btn-primary" id="submitButton" type="button">Procesar</button>
+          <button id="clearButton" type="button">Limpiar</button>
+        </div>
+
+        <div class="message hidden" id="messageBox"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Datos recibidos</h2>
+        <div class="status" id="rowCount">0 registros</div>
+      </div>
+      <div class="panel-body">
+        <div class="summary">
+          <div class="metric">
+            <div class="metric-label">Compania</div>
+            <div class="metric-value" id="companyPreview">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Banco</div>
+            <div class="metric-value" id="bankPreview">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Cuenta</div>
+            <div class="metric-value" id="accountPreview">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Archivo</div>
+            <div class="metric-value" id="filePreview">-</div>
+          </div>
+        </div>
+
+        <div id="dataArea" class="empty">Aqui se mostraran los datos que devuelva la Lambda.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API_GATEWAY_URL = 'https://an21831oh8.execute-api.us-east-1.amazonaws.com/';
+
+    const columns = [
+      'folio',
+      'cve_compania',
+      'fecha_banco',
+      'cve_banco',
+      'num_cuenta',
+      'sucursal',
+      'cuenta_origen',
+      'bnet',
+      'practicaja',
+      'ordenante',
+      'cve_cliente',
+      'autorizacion',
+      'forma_pago',
+      'cargo',
+      'abono',
+      'fecha_registro',
+      'concepto',
+      'departamento'
+    ];
+
+    const companyCode = document.getElementById('companyCode');
+    const bankCode = document.getElementById('bankCode');
+    const bankAccount = document.getElementById('bankAccount');
+    const returnMode = document.getElementById('returnMode');
+    const fileInput = document.getElementById('fileInput');
+    const fileName = document.getElementById('fileName');
+    const submitButton = document.getElementById('submitButton');
+    const clearButton = document.getElementById('clearButton');
+    const messageBox = document.getElementById('messageBox');
+    const statusText = document.getElementById('statusText');
+    const rowCount = document.getElementById('rowCount');
+    const dataArea = document.getElementById('dataArea');
+    const companyPreview = document.getElementById('companyPreview');
+    const bankPreview = document.getElementById('bankPreview');
+    const accountPreview = document.getElementById('accountPreview');
+    const filePreview = document.getElementById('filePreview');
+
+    let selectedFile = null;
+
+    function isExcelFile(file) {
+      const name = String(file?.name || '').toLowerCase();
+      const type = String(file?.type || '').toLowerCase();
+      return name.endsWith('.xlsx') || name.endsWith('.xls') || type.includes('spreadsheet') || type.includes('excel');
+    }
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result || '');
+          resolve(result.includes(',') ? result.split(',').pop() : result);
+        };
+        reader.onerror = () => reject(reader.error || new Error('No se pudo leer el archivo'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function setMessage(text, type = '') {
+      messageBox.textContent = text;
+      messageBox.className = `message ${type}`.trim();
+      messageBox.classList.remove('hidden');
+    }
+
+    function clearMessage() {
+      messageBox.textContent = '';
+      messageBox.className = 'message hidden';
+    }
+
+    function updatePreview() {
+      companyPreview.textContent = companyCode.value.trim() || '-';
+      bankPreview.textContent = bankCode.value.trim() || '-';
+      accountPreview.textContent = bankAccount.value.trim() || '-';
+      filePreview.textContent = selectedFile ? selectedFile.name : '-';
+      fileName.textContent = selectedFile ? selectedFile.name : 'Selecciona un archivo .xlsx o .xls';
+    }
+
+    function renderRows(rows) {
+      rowCount.textContent = `${rows.length} registro${rows.length === 1 ? '' : 's'}`;
+
+      if (!rows.length) {
+        dataArea.className = 'empty';
+        dataArea.textContent = 'La Lambda no devolvio registros en rows.';
+        return;
+      }
+
+      const tableWrap = document.createElement('div');
+      tableWrap.className = 'table-wrap';
+
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const tbody = document.createElement('tbody');
+
+      const headRow = document.createElement('tr');
+      columns.forEach((column) => {
+        const th = document.createElement('th');
+        th.textContent = column;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+
+      rows.forEach((row) => {
+        const tr = document.createElement('tr');
+        columns.forEach((column) => {
+          const td = document.createElement('td');
+          td.textContent = row?.[column] ?? '';
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+
+      table.append(thead, tbody);
+      tableWrap.appendChild(table);
+      dataArea.className = '';
+      dataArea.textContent = '';
+      dataArea.appendChild(tableWrap);
+    }
+
+    function appendDownload(body) {
+      if (!body.contentBase64) return;
+
+      const file = body.fileName || (returnMode.value === 'pdf' ? 'movimientos_consolidados.pdf' : 'movimientos_consolidados.xlsx');
+      const type = body.contentType || 'application/octet-stream';
+      const link = document.createElement('a');
+      link.href = `data:${type};base64,${body.contentBase64}`;
+      link.download = file;
+      link.textContent = `Descargar ${file}`;
+      link.className = 'download-link';
+
+      const wrapper = document.createElement('div');
+      wrapper.style.marginTop = '12px';
+      wrapper.appendChild(link);
+      messageBox.appendChild(wrapper);
+    }
+
+    async function buildPayload() {
+      const cveCompania = companyCode.value.trim();
+      const cveBanco = bankCode.value.trim();
+      const numCuentaBanco = bankAccount.value.trim();
+
+      return {
+        action: 'consolidar_excel',
+        returnMode: returnMode.value,
+        processAllSheets: true,
+        cve_compania: cveCompania,
+        cve_banco: cveBanco,
+        num_cuenta_banco: numCuentaBanco,
+        files: [{
+          fileName: selectedFile.name,
+          mimeType: selectedFile.type || 'application/octet-stream',
+          cve_compania: cveCompania,
+          cve_banco: cveBanco,
+          num_cuenta_banco: numCuentaBanco,
+          contentBase64: await fileToBase64(selectedFile)
+        }]
+      };
+    }
+
+    async function submit() {
+      clearMessage();
+      const endpoint = API_GATEWAY_URL.trim();
+      const cveCompania = companyCode.value.trim();
+      const cveBanco = bankCode.value.trim();
+      const numCuentaBanco = bankAccount.value.trim();
+
+      if (!endpoint || endpoint === 'https://TU_API_GATEWAY_AQUI') {
+        setMessage('Falta configurar API_GATEWAY_URL dentro del HTML.', 'error');
+        return;
+      }
+
+      if (!cveCompania) {
+        setMessage('Falta cve_compania.', 'error');
+        companyCode.focus();
+        return;
+      }
+
+      if (!cveBanco) {
+        setMessage('Falta cve_banco.', 'error');
+        bankCode.focus();
+        return;
+      }
+
+      if (!numCuentaBanco) {
+        setMessage('Falta num_cuenta_banco.', 'error');
+        bankAccount.focus();
+        return;
+      }
+
+      if (!selectedFile) {
+        setMessage('Selecciona un archivo Excel.', 'error');
+        fileInput.focus();
+        return;
+      }
+
+      if (!isExcelFile(selectedFile)) {
+        setMessage('El archivo seleccionado no parece ser Excel.', 'error');
+        return;
+      }
+
+      submitButton.disabled = true;
+      statusText.textContent = 'Procesando...';
+
+      try {
+        const payload = await buildPayload();
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const raw = await response.text();
+        let body;
+        try {
+          body = raw ? JSON.parse(raw) : {};
+        } catch {
+          body = { ok: false, error: raw };
+        }
+
+        if (!response.ok || body.ok === false) {
+          throw new Error(body.error || body.message || `HTTP ${response.status}`);
+        }
+
+        const rows = Array.isArray(body.rows) ? body.rows : [];
+        renderRows(rows);
+
+        setMessage(`Proceso completado.\nRegistros: ${body.totalRows ?? rows.length}`, 'success');
+        appendDownload(body);
+        statusText.textContent = 'Completado';
+      } catch (error) {
+        renderRows([]);
+        setMessage(`Error procesando Excel:\n${error.message}`, 'error');
+        statusText.textContent = 'Error';
+      } finally {
+        submitButton.disabled = false;
+      }
+    }
+
+    function clearAll() {
+      selectedFile = null;
+      fileInput.value = '';
+      companyCode.value = '';
+      bankCode.value = '';
+      bankAccount.value = '';
+      returnMode.value = 'pdf';
+      clearMessage();
+      renderRows([]);
+      rowCount.textContent = '0 registros';
+      dataArea.className = 'empty';
+      dataArea.textContent = 'Aqui se mostraran los datos que devuelva la Lambda.';
+      statusText.textContent = 'Listo';
+      updatePreview();
+    }
+
+    fileInput.addEventListener('change', () => {
+      selectedFile = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+      if (selectedFile && !isExcelFile(selectedFile)) {
+        setMessage('El archivo seleccionado no parece ser Excel.', 'warning');
+      } else {
+        clearMessage();
+      }
+      updatePreview();
+    });
+
+    companyCode.addEventListener('input', updatePreview);
+    bankCode.addEventListener('input', updatePreview);
+    bankAccount.addEventListener('input', updatePreview);
+    submitButton.addEventListener('click', submit);
+    clearButton.addEventListener('click', clearAll);
+
+    updatePreview();
+  </script>
+</body>
+</html>
