@@ -405,7 +405,7 @@
   </main>
 
   <script>
-    const API_GATEWAY_URL = 'https://an21831oh8.execute-api.us-east-1.amazonaws.com/archivos';
+    const API_GATEWAY_URL = 'https://an21831oh8.execute-api.us-east-1.amazonaws.com/';
 
     const columns = [
       'folio',
@@ -548,6 +548,58 @@
       return lines.join('\n');
     }
 
+    function formatClientFetchError(error, endpoint) {
+      let parsedUrl = null;
+      try {
+        parsedUrl = new URL(endpoint);
+      } catch {
+        parsedUrl = null;
+      }
+
+      const currentOrigin = window.location.origin === 'null'
+        ? `archivo local (${window.location.protocol})`
+        : window.location.origin;
+
+      const lines = [
+        'Error procesando Excel',
+        'Codigo especifico: ERROR_CLIENTE_HTML',
+        `Mensaje tecnico: ${error.message}`,
+        '',
+        'Diagnostico:',
+        `URL usada: ${endpoint || '(vacia)'}`,
+        `Origen del HTML: ${currentOrigin}`,
+        parsedUrl ? `Host API: ${parsedUrl.host}` : 'Host API: URL invalida',
+        parsedUrl ? `Ruta API: ${parsedUrl.pathname || '/'}` : '',
+        '',
+        'El navegador no pudo leer ninguna respuesta del API.',
+        'Eso significa que el error ocurre antes de entrar al manejo normal de la Lambda.',
+        '',
+        'Causas mas probables:',
+        '1. CORS incompleto en API Gateway.',
+        '2. Falta ruta OPTIONS para el preflight.',
+        '3. La ruta no coincide: si API Gateway dice POST /excel, la URL debe terminar en /excel.',
+        '4. El API no esta deployed en el stage que estas usando.',
+        '',
+        'Configura CORS asi:',
+        'Access-Control-Allow-Origin: *',
+        'Access-Control-Allow-Headers: Content-Type',
+        'Access-Control-Allow-Methods: OPTIONS,POST',
+        'Access-Control-Allow-Credentials: NO',
+        '',
+        'En Routes revisa que exista:',
+        'OPTIONS / y POST /',
+        'o si usas /excel:',
+        'OPTIONS /excel y POST /excel',
+        '',
+        'Prueba de ruta:',
+        `Abre esta URL directo en el navegador: ${endpoint}`,
+        'Si sale Missing Authentication Token, Not Found o Route not found, la ruta esta mal.',
+        'Si abre o responde algo pero desde este HTML falla, es CORS.'
+      ].filter(Boolean);
+
+      return lines.join('\n');
+    }
+
     function updatePreview() {
       companyPreview.textContent = companyCode.value.trim() || '-';
       bankPreview.textContent = bankCode.value.trim() || '-';
@@ -686,6 +738,7 @@
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          mode: 'cors',
           body: JSON.stringify(payload)
         });
 
@@ -707,11 +760,7 @@
         statusText.textContent = 'Completado';
       } catch (error) {
         renderRows([]);
-        setMessage([
-          'Error procesando Excel',
-          'Codigo especifico: ERROR_CLIENTE_HTML',
-          `Mensaje: ${error.message}`
-        ].join('\n'), 'error');
+        setMessage(formatClientFetchError(error, endpoint), 'error');
         statusText.textContent = 'Error';
       } finally {
         submitButton.disabled = false;
