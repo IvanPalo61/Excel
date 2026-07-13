@@ -345,7 +345,8 @@
         </div>
 
         <div class="actions">
-          <button class="btn-primary" id="submitButton" type="button">Registrar</button>
+          <button class="btn-primary" id="previewButton" type="button">Previsualizar</button>
+          <button class="btn-primary hidden" id="confirmButton" type="button">Confirmar registro</button>
           <button id="clearButton" type="button">Limpiar</button>
         </div>
 
@@ -413,7 +414,8 @@
     const bankAccount = document.getElementById('bankAccount');
     const fileInput = document.getElementById('fileInput');
     const fileName = document.getElementById('fileName');
-    const submitButton = document.getElementById('submitButton');
+    const previewButton = document.getElementById('previewButton');
+    const confirmButton = document.getElementById('confirmButton');
     const clearButton = document.getElementById('clearButton');
     const messageBox = document.getElementById('messageBox');
     const statusText = document.getElementById('statusText');
@@ -426,6 +428,7 @@
     const filePreview = document.getElementById('filePreview');
 
     let selectedFile = null;
+    let previewReady = false;
 
     function isExcelFile(file) {
       const name = String(file?.name || '').toLowerCase();
@@ -539,6 +542,15 @@
       fileName.textContent = selectedFile ? selectedFile.name : 'Selecciona un archivo .xlsx o .xls';
     }
 
+    function resetPreparedPreview() {
+      previewReady = false;
+      confirmButton.classList.add('hidden');
+      statusText.textContent = 'Listo';
+      rowCount.textContent = '0 registros';
+      textArea.textContent = 'Aqui se mostrara el texto que devuelva la Lambda.';
+      dataArea.textContent = '';
+    }
+
     function renderText(body) {
       const chunks = Array.isArray(body.messageChunks) ? body.messageChunks : [];
       const text = body.message || chunks.join('\n\n') || 'La Lambda no devolvio texto.';
@@ -581,15 +593,15 @@
       dataArea.appendChild(tableWrap);
     }
 
-    async function buildPayload() {
+    async function buildPayload({ register = false } = {}) {
       const cveCompania = companyCode.value.trim();
       const cveBanco = bankCode.value.trim();
       const numCuentaBanco = bankAccount.value.trim();
 
       return {
-        action: 'registrar_excel',
-        returnMode: 'registrar',
-        registrar: true,
+        action: register ? 'registrar_excel' : 'consolidar_excel',
+        returnMode: register ? 'registrar' : 'message',
+        registrar: register,
         processAllSheets: true,
         cve_compania: cveCompania,
         cve_banco: cveBanco,
@@ -605,7 +617,7 @@
       };
     }
 
-    async function submit() {
+    function validateForm() {
       clearMessage();
       const endpoint = API_GATEWAY_URL.trim();
       const cveCompania = companyCode.value.trim();
@@ -614,52 +626,65 @@
 
       if (!endpoint || endpoint === 'https://TU_API_GATEWAY_AQUI') {
         setMessage('Falta configurar API_GATEWAY_URL dentro del HTML.', 'error');
-        return;
+        return false;
       }
 
       if (!cveCompania) {
         setMessage('Falta cve_compania.', 'error');
         companyCode.focus();
-        return;
+        return false;
       }
 
       if (!cveBanco) {
         setMessage('Falta cve_banco.', 'error');
         bankCode.focus();
-        return;
+        return false;
       }
 
       if (!numCuentaBanco) {
         setMessage('Falta num_cuenta_banco.', 'error');
         bankAccount.focus();
-        return;
+        return false;
       }
 
       if (!selectedFile) {
         setMessage('Selecciona un archivo Excel.', 'error');
         fileInput.focus();
-        return;
+        return false;
       }
 
       if (!isExcelFile(selectedFile)) {
         setMessage('El archivo seleccionado no parece ser Excel.', 'error');
-        return;
+        return false;
       }
 
-      submitButton.disabled = true;
-      statusText.textContent = 'Registrando...';
+      return true;
+    }
+
+    async function callApi(payload) {
+      const endpoint = API_GATEWAY_URL.trim();
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        body: JSON.stringify(payload)
+      });
+
+      const raw = await response.text();
+      return { response, raw, body: normalizeApiBody(raw) };
+    }
+
+    async function preview() {
+      if (!validateForm()) return;
+
+      previewButton.disabled = true;
+      confirmButton.disabled = true;
+      confirmButton.classList.add('hidden');
+      statusText.textContent = 'Previsualizando...';
 
       try {
-        const payload = await buildPayload();
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          mode: 'cors',
-          body: JSON.stringify(payload)
-        });
-
-        const raw = await response.text();
-        const body = normalizeApiBody(raw);
+        const payload = await buildPayload({ register: false });
+        const { response, raw, body } = await callApi(payload);
         const rows = Array.isArray(body.rows) ? body.rows : [];
 
         renderText(body);
@@ -671,6 +696,50 @@
           return;
         }
 
+        previewReady = rows.length > 0;
+        confirmButton.classList.toggle('hidden', !previewReady);
+        setMessage(
+          `Previsualizacion lista.\nRegistros leidos: ${body.totalRows ?? rows.length}\nRevisa la tabla y despues presiona Confirmar registro.`,
+          'warning'
+        );
+        statusText.textContent = 'Listo para confirmar';
+      } catch (error) {
+        renderRows([]);
+        setMessage(formatClientFetchError(error, API_GATEWAY_URL.trim()), 'error');
+        statusText.textContent = 'Error';
+      } finally {
+        previewButton.disabled = false;
+        confirmButton.disabled = false;
+      }
+    }
+
+    async function confirmRegistration() {
+      if (!previewReady) {
+        setMessage('Primero genera la previsualizacion y revisa los datos.', 'warning');
+        return;
+      }
+      if (!validateForm()) return;
+
+      previewButton.disabled = true;
+      confirmButton.disabled = true;
+      statusText.textContent = 'Registrando...';
+
+      try {
+        const payload = await buildPayload({ register: true });
+        const { response, raw, body } = await callApi(payload);
+        const rows = Array.isArray(body.rows) ? body.rows : [];
+
+        renderText(body);
+        renderRows(rows);
+
+        if (!response.ok || body.ok === false) {
+          setMessage(formatApiError(body, response, raw), 'error');
+          statusText.textContent = `Error ${getSpecificCode(body, response)}`;
+          return;
+        }
+
+        previewReady = false;
+        confirmButton.classList.add('hidden');
         setMessage(
           `Registro completado.\nRegistros leidos: ${body.totalRows ?? rows.length}\nRegistros insertados: ${body.insertedRows ?? body.db?.insertedRows ?? rows.length}`,
           'success'
@@ -678,10 +747,11 @@
         statusText.textContent = 'Registrado';
       } catch (error) {
         renderRows([]);
-        setMessage(formatClientFetchError(error, endpoint), 'error');
+        setMessage(formatClientFetchError(error, API_GATEWAY_URL.trim()), 'error');
         statusText.textContent = 'Error';
       } finally {
-        submitButton.disabled = false;
+        previewButton.disabled = false;
+        confirmButton.disabled = false;
       }
     }
 
@@ -691,6 +761,8 @@
       companyCode.value = '';
       bankCode.value = '';
       bankAccount.value = '';
+      previewReady = false;
+      confirmButton.classList.add('hidden');
       clearMessage();
       rowCount.textContent = '0 registros';
       textArea.textContent = 'Aqui se mostrara el texto que devuelva la Lambda.';
@@ -701,6 +773,7 @@
 
     fileInput.addEventListener('change', () => {
       selectedFile = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+      resetPreparedPreview();
       if (selectedFile && !isExcelFile(selectedFile)) {
         setMessage('El archivo seleccionado no parece ser Excel.', 'warning');
       } else {
@@ -709,10 +782,20 @@
       updatePreview();
     });
 
-    companyCode.addEventListener('input', updatePreview);
-    bankCode.addEventListener('input', updatePreview);
-    bankAccount.addEventListener('input', updatePreview);
-    submitButton.addEventListener('click', submit);
+    companyCode.addEventListener('input', () => {
+      resetPreparedPreview();
+      updatePreview();
+    });
+    bankCode.addEventListener('input', () => {
+      resetPreparedPreview();
+      updatePreview();
+    });
+    bankAccount.addEventListener('input', () => {
+      resetPreparedPreview();
+      updatePreview();
+    });
+    previewButton.addEventListener('click', preview);
+    confirmButton.addEventListener('click', confirmRegistration);
     clearButton.addEventListener('click', clearAll);
 
     updatePreview();
